@@ -36,5 +36,4 @@ services:
     environment:
       - DEBUG=true
     env_file:
-      - path: ./.env
-        required: true
+      - ./.env

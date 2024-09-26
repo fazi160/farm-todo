@@ -8,8 +8,12 @@ from fastapi import FastAPI, status
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 import uvicorn
+from fastapi import HTTPException
 
 from dal import ToDoDAL, ListSummary, ToDoList
+from fastapi.middleware.cors import CORSMiddleware
+
+
 
 COLLECTION_NAME = "todo_lists"
 MONGODB_URI = os.environ["MONGODB_URI"]
@@ -39,6 +43,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, debug=DEBUG)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust as needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get('/api/sample')
+async def sample():
+    return {'working': 'its working'}
+
+
 
 @app.get("/api/lists")
 async def get_all_lists() -> list[ListSummary]:
@@ -64,13 +82,17 @@ async def create_todo_list(new_list: NewList) -> NewListResponse:
 
 @app.get("/api/lists/{list_id}")
 async def get_list(list_id: str) -> ToDoList:
-    """Get a single to-do list"""
-    return await app.todo_dal.get_todo_list(list_id)
-
+    doc = await app.todo_dal.get_todo_list(list_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="List not found")
+    return doc
 
 @app.delete("/api/lists/{list_id}")
 async def delete_list(list_id: str) -> bool:
-    return await app.todo_dal.delete_todo_list(list_id)
+    success = await app.todo_dal.delete_todo_list(list_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="List not found")
+    return True
 
 
 class NewItem(BaseModel):
@@ -122,10 +144,9 @@ async def get_dummy() -> DummyResponse:
 
 def main(argv=sys.argv[1:]):
     try:
-        uvicorn.run("server:app", host="0.0.0.0", port=3001, reload=DEBUG)
+        uvicorn.run("server:app", host="0.0.0.0", port=3001, reload=DEBUG)  # Use port 3001 here
     except KeyboardInterrupt:
         pass
-
 
 if __name__ == "__main__":
     main()
